@@ -406,6 +406,7 @@ HAL.seller = async () => {
         await setDoc(doc(db, "sellers", b.dataset.isi), { stock: increment(Number($("isiStok").value || 0)), updatedAt: Date.now() }, { merge: true });
       });
   });
+
   document.querySelectorAll("[data-hapus]").forEach((b) => {
     b.onclick = async () => {
       if (!confirm("Hapus seller ini?")) return;
@@ -496,6 +497,69 @@ HAL.frame = () => halamanVipConfig("frame", "Frame");
 HAL.vip = () => halamanVipConfig("vip", "VIP");
 
 /* ================= HALAMAN: banner ================= */
+/* ================= unggah gambar banner (rasio 1:3) ================= */
+const FUNGSI_ASET = "https://superagent-74f44334.base44.app/functions/rapsUnggahAset";
+const RASIO_BANNER = 3; // lebar : tinggi = 3 : 1
+
+/** Potong tengah gambar ke rasio 1:3 lalu kecilkan, hasilnya Blob JPEG. */
+function potongRasio(berkas, rasio = RASIO_BANNER, lebarMaks = 1200) {
+  return new Promise((selesai, gagal) => {
+    const url = URL.createObjectURL(berkas);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const rasioAsli = img.width / img.height;
+      let sx = 0, sy = 0, sw = img.width, sh = img.height;
+      if (rasioAsli > rasio) {            // terlalu lebar: potong kiri-kanan
+        sw = Math.round(img.height * rasio);
+        sx = Math.round((img.width - sw) / 2);
+      } else if (rasioAsli < rasio) {     // terlalu tinggi: potong atas-bawah
+        sh = Math.round(img.width / rasio);
+        sy = Math.round((img.height - sh) / 2);
+      }
+      const lebar = Math.min(lebarMaks, sw);
+      const tinggi = Math.round(lebar / rasio);
+      const kanvas = document.createElement("canvas");
+      kanvas.width = lebar; kanvas.height = tinggi;
+      const ctx = kanvas.getContext("2d");
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(img, sx, sy, sw, sh, 0, 0, lebar, tinggi);
+      kanvas.toBlob((b) => b ? selesai(b) : gagal(new Error("Gagal mengolah gambar")), "image/jpeg", 0.9);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); gagal(new Error("Berkas ini bukan gambar")); };
+    img.src = url;
+  });
+}
+
+function blobKeBase64(b) {
+  return new Promise((selesai, gagal) => {
+    const r = new FileReader();
+    r.onload = () => selesai(String(r.result || "").replace(/^data:[^,]*,/, ""));
+    r.onerror = () => gagal(new Error("Gagal membaca berkas"));
+    r.readAsDataURL(b);
+  });
+}
+
+/** Unggah gambar banner ke repo aset gratis, kembalikan URL publiknya. */
+async function unggahBanner(berkas, lapor) {
+  if (!auth.currentUser) throw new Error("Sesi login tidak ada, muat ulang panel lalu masuk lagi");
+  lapor("Memotong gambar ke rasio 1:3…");
+  const blob = await potongRasio(berkas);
+  if (blob.size > 8 * 1024 * 1024) throw new Error("Gambar terlalu besar setelah dipotong");
+  lapor("Mengunggah…");
+  const idToken = await auth.currentUser.getIdToken();
+  const data = await blobKeBase64(blob);
+  const nama = "banner_" + Date.now() + ".jpg";
+  const r = await fetch(FUNGSI_ASET, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ idToken, folder: "banner", nama, contentType: "image/jpeg", data })
+  });
+  const j = await r.json().catch(() => null);
+  if (!j || !j.ok) throw new Error((j && j.e) || ("HTTP " + r.status));
+  return j.url;
+}
+
 HAL.banner = async () => {
   const snap = await getDocs(collection(db, "banners"));
   const kartu = snap.docs.map((d) => {
@@ -513,21 +577,64 @@ HAL.banner = async () => {
     <div class="baris"><button class="tbl" id="tambahBanner">+ New Banner</button></div>
     <div class="kisi">${kartu}</div>`;
 
-  $("tambahBanner").onclick = () => modal("New Banner", `
+  // Pemilih berkas: potong ke 1:3, unggah, lalu isi otomatis kolom tautan.
+  const pasangPilih = () => {
+    const f = $("bFile");
+    if (!f) return;
+    f.onchange = async () => {
+      const berkas = f.files?.[0];
+      if (!berkas) return;
+      window.__bannerUrlSiap = "";
+      window.__unggahBannerSedang = true;
+      const pratinjau = $("bPratinjau"), gbr = $("bGbr"), info = $("bInfo");
+      pratinjau.style.display = "block";
+      gbr.src = URL.createObjectURL(berkas);
+      info.textContent = "Memotong gambar ke rasio 1:3…";
+      try {
+        const url = await unggahBanner(berkas, (m) => { info.textContent = m; });
+        window.__bannerUrlSiap = url;
+        $("bUrl").value = url;
+        info.textContent = "Siap. Gambar 1:3 tersimpan.";
+      } catch (e) {
+        info.textContent = "Gagal: " + (e.message || e);
+        $("bUrl").value = "";
+      } finally {
+        window.__unggahBannerSedang = false;
+      }
+    };
+  };
+
+  $("tambahBanner").onclick = () => { modal("New Banner", `
     <label>Judul</label><input id="bJudul" placeholder="Event Spesial">
     <label>Subjudul</label><input id="bSub" placeholder="Kumpulkan poin dan menangkan hadiah">
-    <label>Tautan gambar</label><input id="bUrl" placeholder="https://cdn.jsdelivr.net/gh/...">
+    <label>Gambar banner (otomatis dipotong 1:3)</label>
+    <input id="bFile" type="file" accept="image/*">
+    <div id="bPratinjau" style="display:none;margin-top:8px">
+      <div style="width:100%;aspect-ratio:3/1;border-radius:10px;overflow:hidden;border:1px solid var(--garis)">
+        <img id="bGbr" style="width:100%;height:100%;object-fit:cover;display:block">
+      </div>
+      <div class="catatan" id="bInfo" style="margin-top:6px"></div>
+    </div>
+    <label>Tautan gambar (boleh tempel URL sendiri)</label><input id="bUrl" placeholder="https://cdn.jsdelivr.net/gh/...">
     <label>Tautan saat diklik (opsional)</label><input id="bLink" placeholder="https://...">
     <div class="dua"><div><label>Urutan</label><input id="bOrder" type="number" value="0"></div>
     <div><label>Status</label><select id="bAktif"><option value="1">Tampil</option><option value="0">Sembunyi</option></select></div></div>`,
     async () => {
+      const berkas = $("bFile")?.files?.[0];
+      let url = $("bUrl").value.trim();
+      if (berkas) {
+        if (window.__unggahBannerSedang) throw new Error("Gambar masih diunggah, tunggu sebentar");
+        url = window.__bannerUrlSiap || "";
+        if (!url) throw new Error("Gambar belum selesai diunggah, pilih ulang lalu tunggu");
+      }
+      if (!url) throw new Error("Pilih gambar banner dulu");
       const id = "b" + Date.now();
       await setDoc(doc(db, "banners", id), {
         title: $("bJudul").value.trim(), subtitle: $("bSub").value.trim(),
-        imageUrl: $("bUrl").value.trim(), link: $("bLink").value.trim(),
+        imageUrl: url, link: $("bLink").value.trim(),
         order: Number($("bOrder").value || 0), active: $("bAktif").value === "1"
       });
-    });
+    }); pasangPilih(); };
 
   document.querySelectorAll("[data-hapus]").forEach((b) => {
     b.onclick = async () => {

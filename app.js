@@ -1,4 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getDatabase as getDatabaseBaru, ref as rRefBaru, get as rGetBaru } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword, signInWithPopup,
   signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut,
@@ -24,6 +25,7 @@ const PEMILIK = "fedli840@gmail.com";
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+const rtdbBaru = getDatabaseBaru(app);
 
 /* ================= util ================= */
 const $ = (id) => document.getElementById(id);
@@ -50,6 +52,15 @@ async function uidDari(nilai) {
     throw new Error("Email itu belum punya data user.");
   }
   if (!/^\d+$/.test(t)) return t;                        // sudah UID
+  // 1) Sumber utama: Realtime Database ids/i/{ID}/uid (ditulis aplikasi saat akun dibuat).
+  try {
+    const r = await rGetBaru(rRefBaru(rtdbBaru, "ids/i/" + t + "/uid"));
+    if (r.exists() && r.val()) return String(r.val());
+  } catch (e) { }
+  try {
+    const r2 = await rGetBaru(rRefBaru(rtdbBaru, "ids/i/" + t));
+    if (r2.exists()) { const v = r2.val(); const u = typeof v === "string" ? v : (v && v.uid); if (u) return String(u); }
+  } catch (e) { }
   const s = await getDoc(doc(db, "userIds", t));
   if (s.exists() && s.data().uid) return s.data().uid;
   for (const medan of ["userId", "uid"]) {
@@ -58,7 +69,7 @@ async function uidDari(nilai) {
   }
   const q2 = await getDocs(query(collection(db, "users"), where("userId", "==", t), limit(1)));
   if (!q2.empty) return q2.docs[0].id;
-  throw new Error("ID " + t + " tidak ditemukan.");
+  throw new Error("ID " + t + " tidak ditemukan di Realtime Database maupun Firestore. Pakai UID panjang atau email akun itu.");
 }
 
 const profil = async (uid) => {
@@ -150,9 +161,10 @@ async function bukaHalaman(nama) {
 
 /* ================= modal ================= */
 let simpanModal = null;
+let modalUid = "";
 function modal(judul, isiHtml, saatSimpan, labelSimpan = "Simpan") {
   $("modalJudul").textContent = judul;
-  $("modalIsi").innerHTML = isiHtml;
+  $("modalIsi").innerHTML = isiHtml + (modalUid ? `<div class="catatan" style="margin-top:12px">Tujuan UID: <b style="word-break:break-all">${modalUid}</b><br>Cocokkan dengan UID akun di HP (Pengaturan di aplikasi).</div>` : "");
   $("pesanModal").textContent = "";
   $("modalSimpan").textContent = labelSimpan;
   simpanModal = saatSimpan;
@@ -231,6 +243,7 @@ async function tampilUser(uid) {
       </div>
     </div>`;
 
+  modalUid = uid;
   $("uCoin").onclick = () => modal("Kirim coin", `
     <label>Jumlah coin</label><input id="mCoin" type="number" value="1000">
     <div class="catatan">Saldo ditambah ke dompet user ini.</div>`,

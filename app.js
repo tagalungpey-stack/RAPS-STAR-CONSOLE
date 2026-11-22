@@ -251,6 +251,8 @@ async function tampilUser(uid) {
       const n = Number($("mCoin").value || 0);
       if (n === 0) throw new Error("Jumlah coin belum diisi.");
       await setDoc(doc(db, "wallets", uid), { coins: increment(n), diperbarui: serverTimestamp() }, { merge: true });
+      const cek = await getDoc(doc(db, "wallets", uid));
+      alert("Coin terkirim.\nUID: " + uid + "\nSaldo tersimpan sekarang: " + Number(cek.data()?.coins || 0).toLocaleString("id-ID") + " coin");
     });
 
   $("uVip").onclick = () => modal("Kirim VIP", `

@@ -564,23 +564,44 @@ HAL.banner = async () => {
   const snap = await getDocs(collection(db, "banners"));
   const kartu = snap.docs.map((d) => {
     const b = d.data();
-    return `<div class="kartu item">
-      <div class="gbr" style="background-image:url('${aman(b.imageUrl || "")}')"></div>
-      <div class="info"><b>${aman(b.title || "(tanpa judul)")}</b>
+    const adaGambar = !!(b.imageUrl || "").trim();
+    return `<div class="kartu bn">
+      <div class="bnGbr">${adaGambar
+        ? `<img src="${aman(b.imageUrl)}" alt="" loading="lazy">`
+        : '<div class="bnKosong">Tanpa gambar</div>'}</div>
+      <div class="bnInfo"><b>${aman(b.title || "(tanpa judul)")}</b>
         <span>${aman(b.subtitle || "")}</span>
         <span>${aman(b.link || "tanpa tautan")}</span>
+        <span class="catatan">${b.active === false ? "Disembunyikan" : "Tampil"} · urutan ${aman(String(b.order ?? 0))}</span>
         <div class="aksi"><button class="tbl kecil merah" data-hapus="${aman(d.id)}">Hapus</button></div>
       </div></div>`;
   }).join("") || '<div class="kosong">Belum ada banner</div>';
 
   $("isi").innerHTML = `<h1>Banner</h1>
+    <div class="catatan" style="margin-bottom:10px">Tampilan di sini sama dengan di aplikasi (rasio 3:1). Banner yang gambarnya sudah bertulisan tidak ditimpa teks.</div>
     <div class="baris"><button class="tbl" id="tambahBanner">+ New Banner</button></div>
-    <div class="kisi">${kartu}</div>`;
+    <div class="kisiBn">${kartu}</div>`;
 
   // Pemilih berkas: potong ke 1:3, unggah, lalu isi otomatis kolom tautan.
   const pasangPilih = () => {
     const f = $("bFile");
     if (!f) return;
+    const u = $("bUrl");
+    if (u) u.oninput = () => {
+      const alamat = u.value.trim();
+      const info = $("bInfo"), pr = $("bPratinjau"), gbr = $("bGbr");
+      if (!alamat) { pr.style.display = "none"; return; }
+      const im = new Image();
+      im.onload = () => {
+        pr.style.display = "block"; gbr.src = alamat;
+        const r = im.width / im.height;
+        info.textContent = Math.abs(r - 3) < 0.05
+          ? "Rasio " + im.width + "×" + im.height + " (3:1), pas."
+          : "Peringatan: gambar ini " + im.width + "×" + im.height + " (bukan 3:1), akan terpotong di aplikasi. Lebih baik pilih berkas supaya dipotong otomatis.";
+      };
+      im.onerror = () => { pr.style.display = "block"; info.textContent = "Gambar tidak bisa dimuat dari tautan ini."; };
+      im.src = alamat;
+    };
     f.onchange = async () => {
       const berkas = f.files?.[0];
       if (!berkas) return;
@@ -607,7 +628,7 @@ HAL.banner = async () => {
   $("tambahBanner").onclick = () => { modal("New Banner", `
     <label>Judul</label><input id="bJudul" placeholder="Event Spesial">
     <label>Subjudul</label><input id="bSub" placeholder="Kumpulkan poin dan menangkan hadiah">
-    <label>Gambar banner (otomatis dipotong 1:3)</label>
+    <label>Gambar banner (otomatis dipotong rasio 3:1, ideal 1200×400)</label>
     <input id="bFile" type="file" accept="image/*">
     <div id="bPratinjau" style="display:none;margin-top:8px">
       <div style="width:100%;aspect-ratio:3/1;border-radius:10px;overflow:hidden;border:1px solid var(--garis)">

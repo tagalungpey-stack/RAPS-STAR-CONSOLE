@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RAPS STAR · Developer Panel</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+
+<!-- ============ MASUK ============ -->
+<div id="masuk">
+  <div class="kotakMasuk">
+    <div class="logo">RAPS STAR</div>
+    <div class="sub">Developer Panel</div>
+    <label>Email panel</label>
+    <input id="email" type="email" placeholder="nama@email.com" autocomplete="username">
+    <label>Sandi</label>
+    <input id="sandi" type="password" placeholder="••••••••" autocomplete="current-password">
+    <button class="tbl penuh" id="masukEmail">Masuk</button>
+    <button class="tbl penuh abu" id="masukGoogle">Masuk dengan Google</button>
+    <div class="pesan" id="pesanMasuk"></div>
+    <div class="catatan">Hanya pemilik dan akun yang terdaftar sebagai admin yang bisa memakai panel ini.</div>
+  </div>
+</div>
+
+<!-- ============ APP ============ -->
+<div id="app">
+  <div id="tirai"></div>
+
+  <aside id="sisi">
+    <div class="sisiAtas">
+      <div class="logo">RAPS STAR</div>
+      <div class="sub" id="emailPanel">–</div>
+    </div>
+
+    <div class="grup">Utama</div>
+    <button class="menu aktif" data-hal="dashboard"><span class="ik">▦</span>Dashboard</button>
+    <button class="menu" data-hal="user"><span class="ik">👤</span>User</button>
+    <button class="menu" data-hal="manager"><span class="ik">🛡</span>Manager</button>
+    <button class="menu" data-hal="admin"><span class="ik">🔑</span>Admin</button>
+    <button class="menu" data-hal="seller"><span class="ik">💰</span>Coin Seller</button>
+
+    <div class="grup">Konten</div>
+    <button class="menu" data-hal="frame"><span class="ik">🖼</span>Frame</button>
+    <button class="menu" data-hal="banner"><span class="ik">🎏</span>Banner</button>
+    <button class="menu" data-hal="vip"><span class="ik">👑</span>VIP</button>
+    <button class="menu" data-hal="game"><span class="ik">🎮</span>Game</button>
+
+    <div class="grup">Sistem</div>
+    <button class="menu" data-hal="coin"><span class="ik">🪙</span>Coin</button>
+    <button class="menu" data-hal="blokir"><span class="ik">🚫</span>Blokir</button>
+    <button class="menu" data-hal="rilis"><span class="ik">📦</span>Rilis</button>
+
+    <div class="grup">Akun</div>
+    <button class="menu" id="keluar"><span class="ik">⎋</span>Keluar</button>
+  </aside>
+
+  <main id="utama">
+    <div class="bar">
+      <button class="hamb" id="hamb">☰</button>
+      <span class="chip" id="jejakHal">Dashboard</span>
+      <div class="jejak">masuk sebagai <b id="jejakEmail">–</b></div>
+    </div>
+    <div id="isi"></div>
+  </main>
+</div>
+
+<!-- ============ MODAL ============ -->
+<div id="modal">
+  <div class="dialog">
+    <div class="judul"><span id="modalJudul">New</span><button id="modalTutup">×</button></div>
+    <div id="modalIsi"></div>
+    <div class="kaki">
+      <button class="tbl" id="modalSimpan">Simpan</button>
+      <button class="tbl abu" id="modalBatal">Batal</button>
+    </div>
+    <div class="pesan" id="pesanModal"></div>
+  </div>
+</div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>

@@ -137,7 +137,7 @@ $("keluar").onclick = () => signOut(auth);
 /* ================= navigasi ================= */
 const JUDUL = {
   dashboard: "Dashboard", user: "User", manager: "Manager", admin: "Admin", seller: "Coin Seller",
-  frame: "Frame", banner: "Banner", vip: "VIP", game: "Game", coin: "Coin", blokir: "Blokir", rilis: "Rilis"
+  frame: "Frame", banner: "Banner", vip: "VIP", game: "Game", coin: "Coin", blokir: "Blokir", diagnosa: "Diagnosa", rilis: "Rilis"
 };
 const HAL = {};
 let halAktif = "dashboard";
@@ -652,6 +652,49 @@ HAL.blokir = async () => {
 };
 
 /* ================= HALAMAN: rilis ================= */
+
+/* ================= diagnosa dompet ================= */
+HAL.diagnosa = async () => {
+  $("isi").innerHTML = `<h1>Diagnosa dompet</h1>
+    <div class="kartu" style="padding:16px">
+      <label>ID angka, UID, atau email user</label>
+      <input id="dgCari" placeholder="100000">
+      <div class="baris" style="margin-top:12px"><button class="tbl" id="dgTombol">Periksa</button></div>
+      <div id="dgHasil" style="margin-top:14px"></div>
+    </div>
+    <div class="kartu tbltabel" style="margin-top:14px">
+      <div style="padding:12px 14px" class="catatan">Dompet dengan coin terbanyak (bukti coin benar-benar tersimpan):</div>
+      <table><thead><tr><th>Dokumen dompet</th><th>Coin</th><th>Diamond</th></tr></thead>
+      <tbody id="dgTop"><tr><td colspan="3" class="kosong">Memuat…</td></tr></tbody></table>
+    </div>`;
+
+  $("dgTombol").onclick = async () => {
+    const kotak = $("dgHasil");
+    kotak.innerHTML = '<div class="catatan">Memeriksa…</div>';
+    try {
+      const uid = await uidDari($("dgCari").value);
+      const w = await getDoc(doc(db, "wallets", uid));
+      const d = w.exists() ? w.data() : null;
+      kotak.innerHTML = `<div class="catatan">UID tujuan: <b style="word-break:break-all">${aman(uid)}</b></div>
+        <div class="catatan" style="margin-top:8px">Dokumen: <code>wallets/${aman(uid)}</code> ${d ? "ada" : "<b>tidak ada</b>"}</div>
+        <div class="catatan" style="margin-top:8px">Coin: <b>${d ? aman(String(d.coins ?? 0)) : "0"}</b> · Diamond: <b>${d ? aman(String(d.diamonds ?? 0)) : "0"}</b> · VIP: <b>${d ? aman(String(d.vip ?? 0)) : "0"}</b></div>
+        <div class="catatan" style="margin-top:10px">Cocokkan UID di atas dengan penanda di tab Saya aplikasi (baris kecil paling bawah: RAPS STAR v… · dompet …).</div>`;
+    } catch (e) { kotak.innerHTML = `<div class="catatan">${aman(galat(e))}</div>`; }
+  };
+
+  try {
+    const snap = await getDocs(query(collection(db, "wallets"), orderBy("coins", "desc"), limit(20)));
+    const baris = snap.docs.map((d) => {
+      const x = d.data();
+      return `<tr><td><span class="lencana">${aman(d.id.slice(0, 14))}</span></td>
+        <td>${aman(String(x.coins ?? 0))}</td><td>${aman(String(x.diamonds ?? 0))}</td></tr>`;
+    }).join("") || '<tr><td colspan="3" class="kosong">Belum ada dompet berisi coin</td></tr>';
+    $("dgTop").innerHTML = baris;
+  } catch (e) {
+    $("dgTop").innerHTML = `<tr><td colspan="3" class="kosong">${aman(galat(e))}</td></tr>`;
+  }
+};
+
 HAL.rilis = async () => {
   const ambil = async (u) => { try { const r = await fetch(u + "?t=" + Date.now()); return await r.json(); } catch { return null; } };
   const info = await ambil("https://tagalungpey-stack.github.io/RAPS-STAR-APK/unduh/build-info.json");

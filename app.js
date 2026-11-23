@@ -137,7 +137,8 @@ $("keluar").onclick = () => signOut(auth);
 /* ================= navigasi ================= */
 const JUDUL = {
   dashboard: "Dashboard", user: "User", manager: "Manager", admin: "Admin", seller: "Coin Seller",
-  frame: "Frame", banner: "Banner", vip: "VIP", game: "Game", coin: "Coin", blokir: "Blokir", diagnosa: "Diagnosa", rilis: "Rilis"
+  frame: "Frame", banner: "Banner", vip: "VIP", game: "Game", coin: "Coin", blokir: "Blokir", diagnosa: "Diagnosa", rilis: "Rilis",
+  medali: "Medali", badge: "VIP Badge", idcantik: "ID Cantik", cashback: "Cashback"
 };
 const HAL = {};
 let halAktif = "dashboard";
@@ -495,6 +496,54 @@ async function halamanVipConfig(slot, judul) {
 }
 HAL.frame = () => halamanVipConfig("frame", "Frame");
 HAL.vip = () => halamanVipConfig("vip", "VIP");
+HAL.medali = () => halamanVipConfig("medal", "Medali");
+HAL.badge = () => halamanVipConfig("badge", "VIP Badge");
+
+/* ================= HALAMAN: ID cantik ================= */
+HAL.idcantik = async () => {
+  const snap = await getDocs(collection(db, "vipConfig"));
+  const item = snap.docs.map((d) => ({ id: d.id, ...d.data() })).filter((x) => (x.slot || "") === "uid");
+  const kartu = item.map((x) => `
+    <div class="kartu item">
+      <div class="gbr" style="background-image:url('${aman(x.url || "")}')"></div>
+      <div class="info"><b>${aman(x.name || x.id)}</b>
+        <span>Nomor: ${aman(x.customId || "-")}</span>
+        <span>${angka(x.price)} coin · ${angka(x.days)} hari</span>
+        <div class="aksi"><button class="tbl kecil merah" data-hapus="${aman(x.id)}">Hapus</button></div>
+      </div></div>`).join("") || '<div class="kosong">Belum ada ID cantik</div>';
+
+  $("isi").innerHTML = `<h1>ID Cantik</h1>
+    <div class="baris"><button class="tbl" id="tambahId">+ New ID Cantik</button></div>
+    <div class="kisi">${kartu}</div>`;
+
+  $("tambahId").onclick = () => modal("New ID Cantik", `
+    <label>ID item</label><input id="iId" placeholder="uid_100000">
+    <label>Nomor cantik</label><input id="iNomor" placeholder="100000">
+    <label>Nama tampilan</label><input id="iNama" placeholder="Nomor Cantik 100000">
+    <div class="dua"><div><label>Harga coin</label><input id="iHarga" type="number" value="50000"></div>
+    <div><label>Hari</label><input id="iHari" type="number" value="30"></div></div>
+    <label>Tautan gambar (opsional)</label><input id="iUrl" placeholder="https://cdn.jsdelivr.net/gh/...">`,
+    async () => {
+      const id = $("iId").value.trim().replace(/[^a-zA-Z0-9_]/g, "");
+      if (!id) throw new Error("ID item wajib diisi.");
+      const nomor = $("iNomor").value.trim();
+      if (!/^\d+$/.test(nomor)) throw new Error("Nomor cantik harus angka.");
+      await setDoc(doc(db, "vipConfig", id), {
+        id, slot: "uid", name: $("iNama").value.trim() || nomor, customId: nomor,
+        url: $("iUrl").value.trim(), kind: "image",
+        price: Number($("iHarga").value || 0), days: Number($("iHari").value || 30),
+        order: Date.now(), store: true, meta: false, hasData: false, updatedAt: Date.now()
+      }, { merge: true });
+    });
+
+  document.querySelectorAll("[data-hapus]").forEach((b) => {
+    b.onclick = async () => {
+      if (!confirm("Hapus item ini?")) return;
+      await deleteDoc(doc(db, "vipConfig", b.dataset.hapus));
+      bukaHalaman(halAktif);
+    };
+  });
+};
 
 /* ================= HALAMAN: banner ================= */
 /* ================= unggah gambar banner (rasio 1:3) ================= */

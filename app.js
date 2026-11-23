@@ -137,7 +137,7 @@ $("keluar").onclick = () => signOut(auth);
 /* ================= navigasi ================= */
 const JUDUL = {
   dashboard: "Dashboard", user: "User", manager: "Manager", admin: "Admin", seller: "Coin Seller",
-  frame: "Frame", banner: "Banner", vip: "VIP", game: "Game", coin: "Coin", blokir: "Blokir", diagnosa: "Diagnosa", rilis: "Rilis", vip19: "VIP 1-9", gift: "Gift",
+  frame: "Frame", banner: "Banner", vip: "VIP", game: "Game", coin: "Coin", blokir: "Blokir", diagnosa: "Diagnosa", rilis: "Rilis", vip19: "VIP 1-9", gift: "Gift", tag: "Tag Official",
   medali: "Medali", badge: "VIP Badge", idcantik: "ID Cantik", cashback: "Cashback"
 };
 const HAL = {};
@@ -720,6 +720,56 @@ HAL.vip19 = async () => {
 };
 
 /* ================= Gift (tab Hadiah dan Cashback di room) ================= */
+/* ================= Tag Official ================= */
+HAL.tag = async () => {
+  const snap = await getDocs(collection(db, "vipConfig"));
+  const item = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+    .filter((x) => (x.slot || "") === "title" && String(x.id).startsWith("tag_official_"));
+  const kartu = item.map((x) => `
+    <div class="kartu item">
+      <div class="gbr" style="background-image:url('${aman(x.url || "")}');background-size:contain"></div>
+      <div class="info"><b>${aman(x.name || x.id)}</b>
+        <span>${angka(x.price)} coin · ${angka(x.days)} hari</span>
+        <div class="aksi"><button class="tbl kecil merah" data-hapus="${aman(x.id)}">Hapus</button></div>
+      </div></div>`).join("") || '<div class="kosong">Belum ada tag official di aplikasi</div>';
+
+  $("isi").innerHTML = `<h1>Tag Official</h1>
+    <div class="catatan" style="margin-bottom:10px">Tag tampil sebagai gelar bergambar di sebelah nama. Tekan tombol di bawah untuk memasukkan 13 tag resmi ke Store aplikasi.</div>
+    <div class="baris"><button class="tbl biru" id="imporTag">Impor 13 tag official ke Store</button></div>
+    <div id="tagPesan" class="pesan"></div>
+    <div class="kisi">${kartu}</div>`;
+
+  $("imporTag").onclick = async () => {
+    const pesan = $("tagPesan");
+    pesan.className = "pesan"; pesan.textContent = "Mengambil daftar tag…";
+    try {
+      const r = await fetch("https://cdn.jsdelivr.net/gh/tagalungpey-stack/RAPS-STAR-ASET@main/tag/manifest.json?t=" + Date.now());
+      const daftar = await r.json();
+      let n = 0;
+      for (const a of daftar) {
+        await setDoc(doc(db, "vipConfig", a.id), {
+          id: a.id, slot: "title", name: a.name, url: a.url, kind: "image",
+          price: 100000, days: 30, order: Date.now() + n, store: true, meta: false,
+          hasData: false, updatedAt: Date.now()
+        }, { merge: true });
+        n++;
+        pesan.textContent = "Menyimpan " + n + " dari " + daftar.length + "…";
+      }
+      pesan.className = "pesan ok";
+      pesan.textContent = "Selesai. " + n + " tag official masuk Store.";
+      await HAL.tag();
+    } catch (e) { pesan.className = "pesan galat"; pesan.textContent = "Gagal: " + (e.message || e); }
+  };
+
+  document.querySelectorAll("[data-hapus]").forEach((b) => {
+    b.onclick = async () => {
+      if (!confirm("Hapus tag ini?")) return;
+      await deleteDoc(doc(db, "vipConfig", b.dataset.hapus));
+      bukaHalaman("tag");
+    };
+  });
+};
+
 HAL.gift = async () => {
   let daftar = {};
   try {

@@ -741,7 +741,9 @@ HAL.gift = async () => {
 
   $("isi").innerHTML = `<h1>Gift</h1>
     <div class="catatan" style="margin-bottom:10px">Gift biasa tampil di tab <b>Hadiah</b> room. Gift dengan saklar <b>Cashback</b> menyala tampil di tab <b>Cashback</b>.</div>
-    <div class="baris"><button class="tbl" id="tambahGift">+ New Gift</button></div>
+    <div class="baris"><button class="tbl" id="tambahGift">+ New Gift</button>
+      <button class="tbl biru" id="giftAwal">Isi 10 gift standar</button></div>
+    <div id="giftPesan" class="pesan"></div>
     <div class="kisi">${kartu}</div>`;
 
   $("tambahGift").onclick = () => modal("New Gift", `
@@ -776,6 +778,28 @@ HAL.gift = async () => {
       await setBaru(rRefBaru(rtdbBaru, "giftCfg/" + id), data);
       await setDoc(doc(db, "gifts", id), { ...data, diperbarui: serverTimestamp() }, { merge: true });
     });
+
+  $("giftAwal").onclick = async () => {
+    const standar = [
+      ["Mawar","🌹",100,0],["Hati","💖",500,0],["Mahkota","👑",2000,0],
+      ["Mobil","🏎️",5000,0],["Istana","🏰",20000,0],["Naga","🐉",50000,0],
+      ["Kotak Hoki","🎁",1000,1],["Bintang Emas","⭐",5000,1],["Koin Emas","🪙",20000,1],["Jackpot","💎",100000,1],
+    ];
+    const pesan = $("giftPesan");
+    pesan.className = "pesan"; pesan.textContent = "Menyimpan gift standar…";
+    try {
+      for (const [nama, emoji, harga, cb] of standar) {
+        const id = "gift_" + nama.toLowerCase().replace(/[^a-z0-9]/g, "");
+        const data = { name: nama, emoji, icon: "", price: harga, mediaUrl: "", mediaType: "",
+          special: false, rocket: false, cashback: cb === 1, jpRate: 0, jpMult: 0,
+          cbRate: cb === 1 ? 70 : 0, cbPrice: 0 };
+        await setBaru(rRefBaru(rtdbBaru, "giftCfg/" + id), data);
+        await setDoc(doc(db, "gifts", id), { ...data, diperbarui: serverTimestamp() }, { merge: true });
+      }
+      pesan.className = "pesan ok"; pesan.textContent = "10 gift tersimpan (6 Hadiah, 4 Cashback).";
+      await HAL.gift();
+    } catch (e) { pesan.className = "pesan galat"; pesan.textContent = "Gagal: " + (e.message || e); }
+  };
 
   document.querySelectorAll("[data-hapus]").forEach((b) => {
     b.onclick = async () => {
@@ -1135,3 +1159,5 @@ HAL.cashback = async () => {
   };
   $("cbMuat").onclick = () => HAL.cashback();
 };
+
+// pasangGiftAwal

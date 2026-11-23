@@ -663,8 +663,35 @@ HAL.vip19 = async () => {
   }
   $("isi").innerHTML = `<h1>VIP 1 sampai 9</h1>
     <div class="catatan" style="margin-bottom:10px">Unggah gambar untuk tiap tingkat. Rasio dipotong otomatis sesuai jenis aset, lalu tersimpan sebagai aset VIP yang dibaca aplikasi.</div>
+    <div class="baris"><button class="tbl biru" id="imporSvip">Impor aset SVIP dari berkas (30 aset)</button></div>
     <div id="vipPesan" class="pesan"></div>
     ${baris.join("")}`;
+
+  $("imporSvip").onclick = async () => {
+    const pesan = $("vipPesan");
+    pesan.className = "pesan";
+    pesan.textContent = "Mengambil daftar aset…";
+    try {
+      const r = await fetch("https://cdn.jsdelivr.net/gh/tagalungpey-stack/RAPS-STAR-ASET@main/vip/manifest.json?t=" + Date.now());
+      const daftar = await r.json();
+      let sudah = 0;
+      for (const a of daftar) {
+        const id = "vip_" + a.n + "_" + a.slot;
+        await setDoc(doc(db, "vipConfig", id), {
+          id, n: Number(a.n), slot: a.slot, meta: true, kind: a.kind || "image",
+          url: a.url, hasData: false, chunks: 0, poster: "", updatedAt: Date.now()
+        }, { merge: true });
+        sudah++;
+        pesan.textContent = "Menyimpan " + sudah + " dari " + daftar.length + "…";
+      }
+      pesan.className = "pesan ok";
+      pesan.textContent = "Selesai. " + sudah + " aset VIP tersimpan dan langsung terbaca aplikasi.";
+      await HAL.vip19();
+    } catch (e) {
+      pesan.className = "pesan galat";
+      pesan.textContent = "Gagal impor: " + (e.message || e);
+    }
+  };
 
   $("isi").querySelectorAll('input[type="file"]').forEach((f) => {
     f.onchange = async () => {

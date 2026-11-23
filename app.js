@@ -137,7 +137,7 @@ $("keluar").onclick = () => signOut(auth);
 /* ================= navigasi ================= */
 const JUDUL = {
   dashboard: "Dashboard", user: "User", manager: "Manager", admin: "Admin", seller: "Coin Seller",
-  frame: "Frame", banner: "Banner", vip: "VIP", game: "Game", coin: "Coin", blokir: "Blokir", diagnosa: "Diagnosa", rilis: "Rilis",
+  frame: "Frame", banner: "Banner", vip: "VIP", game: "Game", coin: "Coin", blokir: "Blokir", diagnosa: "Diagnosa", rilis: "Rilis", vip19: "VIP 1-9",
   medali: "Medali", badge: "VIP Badge", idcantik: "ID Cantik", cashback: "Cashback"
 };
 const HAL = {};
@@ -608,6 +608,89 @@ async function unggahBanner(berkas, lapor) {
   if (!j || !j.ok) throw new Error((j && j.e) || ("HTTP " + r.status));
   return j.url;
 }
+
+/** Unggah aset umum: folder, rasio (lebar/tinggi), lebar maksimum. */
+async function unggahAset(berkas, folder, rasio, lebarMaks, lapor) {
+  if (!auth.currentUser) throw new Error("Sesi login tidak ada, muat ulang panel lalu masuk lagi");
+  if (lapor) lapor("Menyiapkan gambar…");
+  const blob = await potongRasio(berkas, rasio, lebarMaks);
+  if (blob.size > 8 * 1024 * 1024) throw new Error("Gambar terlalu besar setelah dipotong");
+  if (lapor) lapor("Mengunggah…");
+  const idToken = await auth.currentUser.getIdToken();
+  const data = await blobKeBase64(blob);
+  const nama = folder + "_" + Date.now() + ".jpg";
+  const r = await fetch(FUNGSI_ASET, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ idToken, folder, nama, contentType: "image/jpeg", data })
+  });
+  const j = await r.json().catch(() => null);
+  if (!j || !j.ok) throw new Error((j && j.e) || ("HTTP " + r.status));
+  return j.url;
+}
+
+const SLOT_VIP = [
+  { k: "badge", nama: "Badge", rasio: 1 },
+  { k: "medal", nama: "Medali", rasio: 1 },
+  { k: "frame", nama: "Bingkai", rasio: 1 },
+  { k: "bubble", nama: "Balon chat", rasio: 1 },
+  { k: "cardbg", nama: "Latar kartu", rasio: 0.75 },
+  { k: "title", nama: "Gelar", rasio: 3 },
+  { k: "entry", nama: "Entry room", rasio: 3 },
+];
+
+HAL.vip19 = async () => {
+  const snap = await getDocs(collection(db, "vipConfig"));
+  const peta = {};
+  snap.docs.forEach((d) => {
+    const x = d.data();
+    if (x.meta !== true) return;
+    peta[Number(x.n || 0) + "_" + (x.slot || "")] = x.url || "";
+  });
+  const baris = [];
+  for (let n = 1; n <= 9; n++) {
+    const sel = SLOT_VIP.map((s) => {
+      const url = peta[n + "_" + s.k] || "";
+      return `<div class="selVip">
+        <div class="kcl">${url ? `<img src="${aman(url)}" alt="">` : '<span>kosong</span>'}</div>
+        <div class="nmS">${s.nama}</div>
+        <label class="tbl kecil biru" style="text-align:center;display:block">Pilih
+          <input type="file" accept="image/*" hidden data-n="${n}" data-slot="${s.k}" data-rasio="${s.rasio}">
+        </label>
+      </div>`;
+    }).join("");
+    baris.push(`<div class="kartu vipBaris"><div class="vipKepala">VIP ${n}</div><div class="vipSel">${sel}</div></div>`);
+  }
+  $("isi").innerHTML = `<h1>VIP 1 sampai 9</h1>
+    <div class="catatan" style="margin-bottom:10px">Unggah gambar untuk tiap tingkat. Rasio dipotong otomatis sesuai jenis aset, lalu tersimpan sebagai aset VIP yang dibaca aplikasi.</div>
+    <div id="vipPesan" class="pesan"></div>
+    ${baris.join("")}`;
+
+  $("isi").querySelectorAll('input[type="file"]').forEach((f) => {
+    f.onchange = async () => {
+      const berkas = f.files && f.files[0];
+      if (!berkas) return;
+      const n = Number(f.dataset.n), slot = f.dataset.slot, rasio = Number(f.dataset.rasio);
+      const pesan = $("vipPesan");
+      pesan.className = "pesan";
+      pesan.textContent = "Mengunggah VIP " + n + " " + slot + "…";
+      try {
+        const url = await unggahAset(berkas, "vip", rasio, rasio >= 2 ? 1200 : 600, (t) => { pesan.textContent = t; });
+        const id = "vip_" + n + "_" + slot;
+        await setDoc(doc(db, "vipConfig", id), {
+          id, n, slot, meta: true, kind: "image", url,
+          hasData: false, chunks: 0, poster: "", updatedAt: Date.now()
+        }, { merge: true });
+        pesan.className = "pesan ok";
+        pesan.textContent = "VIP " + n + " " + slot + " tersimpan.";
+        await HAL.vip19();
+      } catch (e) {
+        pesan.className = "pesan galat";
+        pesan.textContent = "Gagal: " + (e.message || e);
+      }
+    };
+  });
+};
 
 HAL.banner = async () => {
   const snap = await getDocs(collection(db, "banners"));

@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getDatabase as getDatabaseBaru, ref as rRefBaru, get as rGetBaru, set as setBaru } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import { getDatabase as getDatabaseBaru, ref as rRefBaru, get as rGetBaru, set as setBaru, remove as hapusBaru } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword, signInWithPopup,
   signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut,
@@ -137,7 +137,7 @@ $("keluar").onclick = () => signOut(auth);
 /* ================= navigasi ================= */
 const JUDUL = {
   dashboard: "Dashboard", user: "User", manager: "Manager", admin: "Admin", seller: "Coin Seller",
-  frame: "Frame", banner: "Banner", vip: "VIP", game: "Game", coin: "Coin", blokir: "Blokir", diagnosa: "Diagnosa", rilis: "Rilis", vip19: "VIP 1-9",
+  frame: "Frame", banner: "Banner", vip: "VIP", game: "Game", coin: "Coin", blokir: "Blokir", diagnosa: "Diagnosa", rilis: "Rilis", vip19: "VIP 1-9", gift: "Gift",
   medali: "Medali", badge: "VIP Badge", idcantik: "ID Cantik", cashback: "Cashback"
 };
 const HAL = {};
@@ -715,6 +715,75 @@ HAL.vip19 = async () => {
         pesan.className = "pesan galat";
         pesan.textContent = "Gagal: " + (e.message || e);
       }
+    };
+  });
+};
+
+/* ================= Gift (tab Hadiah dan Cashback di room) ================= */
+HAL.gift = async () => {
+  let daftar = {};
+  try {
+    const sn = await rGetBaru(rRefBaru(rtdbBaru, "giftCfg"));
+    if (sn.exists()) daftar = sn.val() || {};
+  } catch (e) {
+    $("isi").innerHTML = `<h1>Gift</h1><div class="catatan">Gagal membaca gift: ${aman(e.message || e)}</div>`;
+    return;
+  }
+  const item = Object.entries(daftar).map(([id, g]) => ({ id, ...g }));
+  const kartu = item.map((g) => `
+    <div class="kartu item">
+      <div class="gbr" style="background-image:url('${aman(g.icon || g.mediaUrl || "")}')">${g.icon || g.mediaUrl ? "" : aman(g.emoji || "🎁")}</div>
+      <div class="info"><b>${aman(g.name || g.id)}</b>
+        <span>${angka(g.price)} coin</span>
+        <span class="lencana ${g.cashback || Number(g.cbRate) > 0 ? "hijau" : ""}">${g.cashback || Number(g.cbRate) > 0 ? "Tab Cashback" : "Tab Hadiah"}</span>
+        <div class="aksi"><button class="tbl kecil merah" data-hapus="${aman(g.id)}">Hapus</button></div>
+      </div></div>`).join("") || '<div class="kosong">Belum ada gift. Room akan menampilkan "Belum ada gift" sampai kamu menambah.</div>';
+
+  $("isi").innerHTML = `<h1>Gift</h1>
+    <div class="catatan" style="margin-bottom:10px">Gift biasa tampil di tab <b>Hadiah</b> room. Gift dengan saklar <b>Cashback</b> menyala tampil di tab <b>Cashback</b>.</div>
+    <div class="baris"><button class="tbl" id="tambahGift">+ New Gift</button></div>
+    <div class="kisi">${kartu}</div>`;
+
+  $("tambahGift").onclick = () => modal("New Gift", `
+    <label>Nama gift</label><input id="gfNama" placeholder="Mawar">
+    <div class="dua"><div><label>Emoji</label><input id="gfEmoji" value="🎁"></div>
+    <div><label>Harga (coin)</label><input id="gfHarga" type="number" value="100"></div></div>
+    <label>Gambar ikon (pilih berkas)</label><input id="gfFile" type="file" accept="image/*">
+    <div class="catatan" id="gfInfo"></div>
+    <label>atau tautan ikon</label><input id="gfIcon" placeholder="https://cdn.jsdelivr.net/gh/...">
+    <label>Tautan animasi (opsional, svga/mp4/webp)</label><input id="gfMedia" placeholder="https://...">
+    <div class="dua"><div><label>Jenis animasi</label><select id="gfJenis">
+      <option value="">Tanpa</option><option value="svga">SVGA</option><option value="mp4">MP4</option><option value="image">Gambar</option></select></div>
+    <div><label>Tab</label><select id="gfCb">
+      <option value="0">Hadiah (biasa)</option><option value="1">Cashback</option></select></div></div>
+    <div class="dua"><div><label>Peluang cashback (%)</label><input id="gfCbRate" type="number" value="0"></div>
+    <div><label>Hadiah cashback (coin)</label><input id="gfCbHarga" type="number" value="0"></div></div>`,
+    async () => {
+      const nama = $("gfNama").value.trim();
+      if (!nama) throw new Error("Nama gift wajib diisi.");
+      let icon = $("gfIcon").value.trim();
+      const f = $("gfFile").files && $("gfFile").files[0];
+      if (f) icon = await unggahAset(f, "gift", 1, 512, (t) => { $("gfInfo").textContent = t; });
+      const cb = $("gfCb").value === "1";
+      const id = "gift_" + Date.now();
+      const data = {
+        name: nama, emoji: $("gfEmoji").value.trim() || "🎁", icon,
+        price: Number($("gfHarga").value || 0), mediaUrl: $("gfMedia").value.trim(),
+        mediaType: $("gfJenis").value, special: false, rocket: false, cashback: cb,
+        jpRate: 0, jpMult: 0, cbRate: cb ? Number($("gfCbRate").value || 0) : 0,
+        cbPrice: cb ? Number($("gfCbHarga").value || 0) : 0
+      };
+      await setBaru(rRefBaru(rtdbBaru, "giftCfg/" + id), data);
+      await setDoc(doc(db, "gifts", id), { ...data, diperbarui: serverTimestamp() }, { merge: true });
+    });
+
+  document.querySelectorAll("[data-hapus]").forEach((b) => {
+    b.onclick = async () => {
+      if (!confirm("Hapus gift ini?")) return;
+      const id = b.dataset.hapus;
+      try { await hapusBaru(rRefBaru(rtdbBaru, "giftCfg/" + id)); } catch (e) { alert(galat(e)); return; }
+      try { await deleteDoc(doc(db, "gifts", id)); } catch (e) { }
+      bukaHalaman("gift");
     };
   });
 };

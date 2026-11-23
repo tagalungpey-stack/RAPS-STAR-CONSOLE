@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getDatabase as getDatabaseBaru, ref as rRefBaru, get as rGetBaru } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
+import { getDatabase as getDatabaseBaru, ref as rRefBaru, get as rGetBaru, set as setBaru } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
 import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword, signInWithPopup,
   signInWithRedirect, getRedirectResult, GoogleAuthProvider, signOut,
@@ -842,4 +842,68 @@ HAL.rilis = async () => {
         <a class="tbl" href="https://tagalungpey-stack.github.io/RAPS-STAR-APK/" target="_blank" rel="noopener">Buka halaman unduh</a>
       </div>
     </div>`;
+};
+
+/* ================= Cashback =================
+ * Ditulis ke Realtime Database pub/_cashbackCfg dan langsung dipakai aplikasi,
+ * tanpa perlu build ulang. Angka utama: aktif/tidak, peluang dapat cashback,
+ * batas atas persen, dan peluang zonk.
+ */
+HAL.cashback = async () => {
+  const bawaan = {
+    on: true, modePersen: true, capPct: 12000, recvPct: 70,
+    diamondPct: 5, diamondBiasaPct: 100, kembaliPct: 0,
+    bebasZonkMulai: 0, jpMin: 50000,
+  };
+  let cfg = { ...bawaan };
+  try {
+    const sn = await rGetBaru(rRefBaru(rtdbBaru, "pub/_cashbackCfg"));
+    if (sn.exists()) cfg = { ...bawaan, ...(sn.val() || {}) };
+  } catch (e) {
+    $("isi").innerHTML = `<h1>Cashback</h1><div class="catatan">Gagal membaca pengaturan: ${aman(e.message || e)}</div>`;
+    return;
+  }
+
+  $("isi").innerHTML = `<h1>Cashback</h1>
+    <div class="kartu" style="max-width:640px">
+      <div class="catatan">Cashback gift diatur di sini dan langsung berlaku di aplikasi. <b>Peluang dapat</b> 70 berarti 70% kiriman gift mendapat cashback. <b>Batas atas</b> adalah persen maksimum dari harga gift. <b>Peluang zonk</b> adalah bagian yang tidak dapat apa-apa, jadi sebaiknya kecil.</div>
+      <div class="dua">
+        <div><label>Cashback aktif</label><select id="cbOn">
+          <option value="1" ${cfg.on === false ? "" : "selected"}>Aktif</option>
+          <option value="0" ${cfg.on === false ? "selected" : ""}>Mati</option></select></div>
+        <div><label>Peluang dapat cashback (%)</label><input id="cbPct" type="number" min="0" max="100" value="${Number(cfg.recvPct ?? 70)}"></div>
+      </div>
+      <div class="dua">
+        <div><label>Batas atas cashback (% dari harga)</label><input id="cbCap" type="number" min="1" max="100000" value="${Number(cfg.capPct ?? 12000)}"></div>
+        <div><label>Peluang zonk (%)</label><input id="cbZonk" type="number" min="0" max="100" value="${Math.max(0, Math.min(100, Number(cfg.bebasZonkMulai ?? 0) === 0 ? 8 : Number(cfg.bebasZonkMulai)))}"></div>
+      </div>
+      <div class="dua">
+        <div><label>Minimal gift untuk cashback (coin)</label><input id="cbMin" type="number" min="0" value="${Number(cfg.jpMin ?? 50000)}"></div>
+        <div><label>Cashback ke penerima (%)</label><input id="cbRecv" type="number" min="0" max="100" value="${Number(cfg.recvPct ?? 70)}"></div>
+      </div>
+      <div class="baris" style="margin-top:14px">
+        <button class="tbl" id="cbSimpan">Simpan</button>
+        <button class="tbl abu" id="cbMuat">Muat ulang</button>
+      </div>
+      <div class="pesan" id="cbPesan"></div>
+    </div>`;
+
+  $("cbSimpan").onclick = async () => {
+    const data = {
+      ...cfg,
+      on: $("cbOn").value === "1",
+      modePersen: true,
+      recvPct: Number($("cbPct").value || 0),
+      capPct: Number($("cbCap").value || 1),
+      jpMin: Number($("cbMin").value || 0),
+      bebasZonkMulai: Number($("cbZonk").value || 0),
+    };
+    try {
+      await setBaru(rRefBaru(rtdbBaru, "pub/_cashbackCfg"), data);
+      pesan("cbPesan", "Tersimpan. Cashback langsung berlaku di aplikasi.", "ok");
+    } catch (e) {
+      pesan("cbPesan", "Gagal menyimpan: " + (e.message || e), "salah");
+    }
+  };
+  $("cbMuat").onclick = () => HAL.cashback();
 };

@@ -730,7 +730,11 @@ HAL.tag = async () => {
       <div class="gbr" style="background-image:url('${aman(x.url || "")}');background-size:contain"></div>
       <div class="info"><b>${aman(x.name || x.id)}</b>
         <span>${angka(x.price)} coin · ${angka(x.days)} hari</span>
-        <div class="aksi"><button class="tbl kecil merah" data-hapus="${aman(x.id)}">Hapus</button></div>
+        <div class="aksi">
+          <button class="tbl kecil biru" data-edit="${aman(x.id)}">Edit harga</button>
+          <button class="tbl kecil" data-give="${aman(x.id)}">Give ke ID</button>
+          <button class="tbl kecil merah" data-hapus="${aman(x.id)}">Hapus</button>
+        </div>
       </div></div>`).join("") || '<div class="kosong">Belum ada tag official di aplikasi</div>';
 
   $("isi").innerHTML = `<h1>Tag Official</h1>
@@ -760,6 +764,53 @@ HAL.tag = async () => {
       await HAL.tag();
     } catch (e) { pesan.className = "pesan galat"; pesan.textContent = "Gagal: " + (e.message || e); }
   };
+
+  document.querySelectorAll("[data-edit]").forEach((b) => {
+    const id = b.dataset.edit;
+    const x = item.find((y) => y.id === id) || {};
+    b.onclick = () => modal("Edit " + (x.name || id), `
+      <label>Harga (coin)</label><input id="tHarga" type="number" value="${Number(x.price || 0)}">
+      <label>Masa aktif (hari)</label><input id="tHari" type="number" value="${Number(x.days || 30)}">
+      <label>Nama tag</label><input id="tNama" value="${aman(x.name || id)}">`,
+      async () => {
+        await setDoc(doc(db, "vipConfig", id), {
+          price: Number($("tHarga").value || 0),
+          days: Number($("tHari").value || 30),
+          name: $("tNama").value.trim() || x.name || id,
+          updatedAt: Date.now()
+        }, { merge: true });
+      });
+  });
+
+  document.querySelectorAll("[data-give]").forEach((b) => {
+    const id = b.dataset.give;
+    const x = item.find((y) => y.id === id) || {};
+    b.onclick = () => modal("Give " + (x.name || id), `
+      <label>ID atau UID penerima</label><input id="gUid" placeholder="mis. 100001">
+      <label>Masa aktif (hari)</label><input id="gHari" type="number" value="${Number(x.days || 30)}">
+      <div class="catatan">Tag langsung masuk ke tas akun itu, dan bisa dipakai sebagai gelar tanpa membeli.</div>`,
+      async () => {
+        const masuk = $("gUid").value.trim();
+        if (!masuk) throw new Error("ID penerima wajib diisi.");
+        let uid = masuk;
+        if (/^\d+$/.test(masuk)) {
+          const d1 = await getDoc(doc(db, "userIds", masuk));
+          uid = (d1.exists() && d1.data().uid) || "";
+          if (!uid) {
+            const q = await getDocs(query(collection(db, "userIds"), where("userId", "==", masuk)));
+            uid = q.docs.length ? (q.docs[0].data().uid || "") : "";
+          }
+          if (!uid) throw new Error("ID " + masuk + " tidak ditemukan.");
+        }
+        const hari = Number($("gHari").value || 30);
+        const habis = Date.now() + hari * 86400000;
+        await setDoc(doc(db, "wallets", uid), {
+          inv: { [id]: habis },
+          diperbarui: Date.now()
+        }, { merge: true });
+        return "Tag terkirim ke " + masuk;
+      });
+  });
 
   document.querySelectorAll("[data-hapus]").forEach((b) => {
     b.onclick = async () => {

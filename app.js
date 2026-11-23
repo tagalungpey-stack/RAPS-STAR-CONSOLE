@@ -804,11 +804,16 @@ HAL.tag = async () => {
         }
         const hari = Number($("gHari").value || 30);
         const habis = Date.now() + hari * 86400000;
+        // Tag langsung dipakai: masuk tas, dipasang sebagai gelar, dan
+        // ditulis ke profil publik supaya terlihat oleh semua orang.
         await setDoc(doc(db, "wallets", uid), {
           inv: { [id]: habis },
+          equip: { title: id },
           diperbarui: Date.now()
         }, { merge: true });
-        return "Tag terkirim ke " + masuk;
+        await setDoc(doc(db, "users", uid), { title: id }, { merge: true });
+        try { await setBaru(rRefBaru(rtdbBaru, "pub/" + uid + "/title"), id); } catch (e) { }
+        return "Tag terkirim dan langsung dipakai " + masuk;
       });
   });
 
